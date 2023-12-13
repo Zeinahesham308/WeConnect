@@ -384,6 +384,7 @@ class peerMain:
             # and peer variables are set, and server and client sockets are closed
             if choice == "3":
                 self.logout(1)
+                self.logout(2)
                 self.isOnline = False
                 self.loginCredentials = (None, None)
                 self.peerServer.isOnline = False

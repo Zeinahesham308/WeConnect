@@ -3,15 +3,17 @@
     ##  Implementation of registry
     ##  150114822 - Eren Ulaş
 '''
-import sys
-from socket import *
-import threading
-import select
 import logging
-import db
-import re
 import signal
-import atexit
+import sys
+import threading
+from socket import *
+import bcrypt
+import select
+
+import db
+
+
 # This class is used to process the peer messages sent to registry
 # for each peer connected to registry, a new client thread is created
 class ClientThread(threading.Thread):
@@ -65,7 +67,9 @@ class ClientThread(threading.Thread):
                                 any(char in "!@#$%^&*()-_=+[]{}|;:'\",.<>/?`~" for char in password)
                         # At least one special character
                         ):
-                            db.register(message[1], message[2])
+                            password = message[2]
+                            hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+                            db.register(message[1], hashed)
                             response = "join-success"
                             logging.info("Send to " + self.ip + ":" + str(self.port) + " -> " + response)
                             self.tcpClientSocket.send(response.encode())
@@ -95,7 +99,7 @@ class ClientThread(threading.Thread):
                         retrievedPass = db.get_password(message[1])
                         # if password is correct, then peer's thread is added to threads list
                         # peer is added to db with its username, port number, and ip address
-                        if retrievedPass == message[2]:
+                        if bcrypt.checkpw(message[2].encode('utf-8'), retrievedPass):
                             self.username = message[1]
                             self.lock.acquire()
                             try:
@@ -245,56 +249,31 @@ logging.basicConfig(filename="registry.log", level=logging.INFO)
 
 
 # Signal handler function
-def handle_termination(signal, frame):
-    print("Received termination signal. Closing the registry server...")
-    # Close sockets and perform cleanup
-    tcpSocket.close()
-    udpSocket.close()
-    onlinePeers.clear()  # Clear onlinePeers list
-    print("Registry server closed.")
-    # Exit the program
-    sys.exit(0)
 
-# Set the signal handler for termination signal (SIGTERM)
-signal.signal(signal.SIGTERM, handle_termination)
+while inputs:
 
-
-
-
-
-try:
-    while inputs:
-
-        print("Listening for incoming connections...")
-        # monitors for the incoming connections
-        readable, writable, exceptional = select.select(inputs, [], [])
-        for s in readable:
-            # if the message received comes to the tcp socket
-            # the connection is accepted and a thread is created for it, and that thread is started
-            if s is tcpSocket:
-                tcpClientSocket, addr = tcpSocket.accept()
-                newThread = ClientThread(addr[0], addr[1], tcpClientSocket)
-                newThread.start()
-            # if the message received comes to the udp socket
-            elif s is udpSocket:
-                # received the incoming udp message and parses it
-                message, clientAddress = s.recvfrom(1024)
-                message = message.decode().split()
-                # checks if it is a hello message
-                if message[0] == "HELLO":
-                    # checks if the account that this hello message
-                    # is sent from is online
-                    if message[1] in tcpThreads:
-                        # resets the timeout for that peer since the hello message is received
-                        tcpThreads[message[1]].resetTimeout()
-                        print("Hello is received from " + message[1])
-                        logging.info("Received from " + clientAddress[0] + ":" + str(clientAddress[1]) + " -> " + " ".join(message))
-except KeyboardInterrupt:
-    # Handle KeyboardInterrupt (Ctrl+C) to gracefully close the server
-    print("Registry server is closing...")
-finally:
-    # Close sockets and perform cleanup
-    tcpSocket.close()
-    udpSocket.close()
-    onlinePeers.clear()  # Clear onlinePeers list
-    print("Registry server closed.")
+    print("Listening for incoming connections...")
+    # monitors for the incoming connections
+    readable, writable, exceptional = select.select(inputs, [], [])
+    for s in readable:
+        # if the message received comes to the tcp socket
+        # the connection is accepted and a thread is created for it, and that thread is started
+        if s is tcpSocket:
+            tcpClientSocket, addr = tcpSocket.accept()
+            newThread = ClientThread(addr[0], addr[1], tcpClientSocket)
+            newThread.start()
+        # if the message received comes to the udp socket
+        elif s is udpSocket:
+            # received the incoming udp message and parses it
+            message, clientAddress = s.recvfrom(1024)
+            message = message.decode().split()
+            # checks if it is a hello message
+            if message[0] == "HELLO":
+                # checks if the account that this hello message
+                # is sent from is online
+                if message[1] in tcpThreads:
+                    # resets the timeout for that peer since the hello message is received
+                    tcpThreads[message[1]].resetTimeout()
+                    print("Hello is received from " + message[1])
+                    logging.info("Received from " + clientAddress[0] + ":" + str(clientAddress[1]) + " -> " + " ".join(message))
+tcpSocket.close()
