@@ -246,8 +246,6 @@ inputs = [tcpSocket, udpSocket]
 
 # log file initialization
 logging.basicConfig(filename="registry.log", level=logging.INFO)
-
-
 # Signal handler function
 
 while inputs:

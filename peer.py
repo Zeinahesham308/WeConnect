@@ -9,7 +9,12 @@ import threading
 import time
 import select
 import logging
+import GUI
+from colorama import Fore, Style, init
+from pyfiglet import Figlet
 
+# Create a Figlet object
+fig = Figlet(font='slant', width=100)
 # Server side of peer
 class PeerServer(threading.Thread):
 
@@ -50,8 +55,8 @@ class PeerServer(threading.Thread):
     # main method of the peer server thread
     def run(self):
 
-        print("Peer server started...")    #this appear after the peer is logged in
-
+        GUI.print_colored("Peer server started...You are now ONLINE",Fore.LIGHTGREEN_EX, Style.BRIGHT)    #this appear after the peer is logged in
+        print()
         # gets the ip address of this peer
         # first checks to get it for windows devices
         # if the device that runs this application is not windows
@@ -112,8 +117,14 @@ class PeerServer(threading.Thread):
                                 # gets the username of the peer sends the chat request message
                                 self.chattingClientName = messageReceived[2]
                                 # prints prompt for the incoming chat request
-                                print("Incoming chat request from " + self.chattingClientName + " >> ")
-                                print("Enter OK to accept or REJECT to reject:  ")
+                                GUI.print_colored(f"Incoming chat request from {self.chattingClientName} >>",Fore.LIGHTBLUE_EX, Style.BRIGHT)
+                                print()
+                                GUI.print_colored("Enter ",Fore.LIGHTBLACK_EX, Style.BRIGHT)
+                                GUI.print_colored("OK", Fore.LIGHTGREEN_EX, Style.BRIGHT)
+                                GUI.print_colored(" to accept or", Fore.LIGHTBLACK_EX, Style.BRIGHT)
+                                GUI.print_colored(" REJECT", Fore.LIGHTRED_EX, Style.BRIGHT)
+                                GUI.print_colored(" to reject:  ", Fore.LIGHTBLACK_EX, Style.BRIGHT)
+                                print()
                                 # makes isChatRequested = 1 which means that peer is chatting with someone
                                 self.isChatRequested = 1
                             # if the socket that we received the data does not belong to the peer that we are chatting with
@@ -350,11 +361,19 @@ class peerMain:
         # log file initialization
         logging.basicConfig(filename="peer.log", level=logging.INFO)
         # as long as the user is not logged out, asks to select an option in the menu
+        ascii_art = fig.renderText("W.e.l.c.o.m.e to !!")
+        print(ascii_art)
+        ascii_art = fig.renderText("WE CONNECT CHAT ")
+        print(ascii_art)
+
         while entered=="0":###################
+
             choice = input("Choose: \nCreate account: 1\nLogin: 2\n")
             if choice == "1":
                 username = input("username: ")
-                print("Password should be of at least 8 characters must including (special char , Lowercase, uppercase,numbers)")
+                GUI.print_colored("Password should be of at least 8 characters must including (special char , Lowercase, uppercase,numbers)",Fore.YELLOW, Style.BRIGHT)
+                print()
+
                 password = input("password: ")
                 self.createAccount(username, password)
             elif choice == "2" and not self.isOnline:
@@ -376,7 +395,7 @@ class peerMain:
 
         while choice != "3":
             # menu selection prompt
-            choice = input("WELCOME .... \n Choose: \nLogout: 3\nSearch: 4\nStart a chat: 5\n")
+            choice = input("WELCOME .... \nChoose: \nLogout: 3\nSearch: 4\nStart a chat: 5\n")
             # if choice is 1, creates an account with the username
             # and password entered by the user
 
@@ -467,18 +486,23 @@ class peerMain:
         response = self.tcpClientSocket.recv(1024).decode()
         logging.info("Received from " + self.registryName + " -> " + response)
         if response == "login-success":
-            print("Logged in successfully...")
+
+            GUI.print_colored("Logged in successfully...", Fore.LIGHTGREEN_EX, Style.BRIGHT)
+            print()
             return 1
         elif response == "login-account-not-exist":
-            print("Account does not exist...")
+            GUI.print_colored("Account does not exist...", Fore.LIGHTRED_EX, Style.BRIGHT)
+            print()
             return 0
         elif response == "login-online":
-            print("Account is already online...")
+            GUI.print_colored("Account is already online...", Fore.LIGHTYELLOW_EX, Style.BRIGHT)
+            print()
             return 2
         elif response == "login-wrong-password":
-            print("Wrong password...")
+            GUI.print_colored("Wrong password...", Fore.LIGHTRED_EX, Style.BRIGHT)
+            print()
             return 3
-    
+
     # logout function
     def logout(self, option):
         # a logout message is composed and sent to registry
@@ -503,13 +527,17 @@ class peerMain:
         response = self.tcpClientSocket.recv(1024).decode().split()
         logging.info("Received from " + self.registryName + " -> " + " ".join(response))
         if response[0] == "search-success":
-            print(username + " is found successfully...")
+            GUI.print_colored(f" {username} is found successfully...", Fore.LIGHTGREEN_EX, Style.BRIGHT)
+            print()
             return response[1]
         elif response[0] == "search-user-not-online":
-            print(username + " is not online...")
+            GUI.print_colored(f" {username}  is not online...", Fore.LIGHTRED_EX, Style.BRIGHT)
+            print()
             return 0
         elif response[0] == "search-user-not-found":
-            print(username + " is not found")
+            GUI.print_colored(f" {username}   is not found", Fore.LIGHTRED_EX, Style.BRIGHT)
+            print()
+
             return None
     
     # function for sending hello message
