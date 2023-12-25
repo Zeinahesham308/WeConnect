@@ -38,3 +38,22 @@ class DB:
         return (res["ip"], res["port"]) if res else (None, None)
 
 
+    def get_online_peers(self):
+        online_peers_cursor = self.db.online_peers.find({}, {"username": 1, "_id": 0})
+        online_peers_list = [peer["username"] for peer in online_peers_cursor]
+        return online_peers_list
+
+    # def is_chat_room_exist(self, chatroom_name):
+    #     return self.db.chat_rooms.count_documents({'name': chatroom_name}) > 0
+    #
+    # def create_chat_room(self, chatroom_name):
+    #     chat_room = {
+    #         "name": chatroom_name,
+    #         "members": []  # You can add more information about the chat room as needed
+    #     }
+    #     self.db.chat_rooms.insert_one(chat_room)
+    #
+    # def get_chat_rooms(self):
+    #     chat_rooms_cursor = self.db.chat_rooms.find({}, {"name": 1, "_id": 0})
+    #     chat_rooms_list = [chat_room["name"] for chat_room in chat_rooms_cursor]
+    #     return chat_rooms_list
