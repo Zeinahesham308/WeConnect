@@ -92,25 +92,85 @@ class ClientThread(threading.Thread):
                     else:
                         response = "No online peers."
 
+                    logging.info("Send to " + self.ip + ":" + str(self.port) + " -> " + response)
                     self.tcpClientSocket.send(response.encode())
 
                 # LIST GROUPS #
                 #elif message[0] == "LIST GROUPS":
                 ###############ADDED##########################
-                # elif message[0]=="CREATE-CHAT-ROOM":
-                #     # Check if the chat room already exists
+                    # Handle LIST GROUPS command
+                elif message[0] == "LIST-GROUPS":
+                    chat_rooms = db.get_chat_rooms()
+
+                    #print(response)
+                    if(chat_rooms):
+                        response = "LIST-GROUPS-SUCCESS: " + ', '.join(chat_rooms)
+
+                    else:
+                        response = "No-available-rooms."
+
+                    logging.info("Send to " + self.ip + ":" + str(self.port) + " -> " + response)
+                    self.tcpClientSocket.send(response.encode())
+
+                # Handle CREATE-CHAT-ROOM command
+                elif message[0] == "CREATE-CHAT-ROOM":
+                    chatroom_name = message[1]
+                    chatroom_port = message[2]  # Assuming the port is the third element in the message
+
+                    if db.is_chat_room_exist(chatroom_name):
+                        response = "CREATE-CHAT-ROOM-FAIL Chat room already exists."
+                    else:
+                        db.create_chat_room(chatroom_name, chatroom_port)
+                        response = "CREATE-CHAT-ROOM-SUCCESS"
+
+                    print(response)
+                    logging.info(response)
+                    self.tcpClientSocket.send(response.encode())
+
+                elif message[0] == "SEARCH_ROOM":
+                    # checks if a chat room with the given name exists
+                    if db.is_chat_room_exist(message[1]):
+                        response = "search-room-success " + str(db.get_room_port(message[1]))
+                        logging.info("Send to " + self.ip + ":" + str(self.port) + " -> " + response)
+                        self.tcpClientSocket.send(response.encode())
+                    # enters if chat room does not exist
+                    else:
+                        response = "search-room-not-found"
+                        logging.info("Send to " + self.ip + ":" + str(self.port) + " -> " + response)
+                        self.tcpClientSocket.send(response.encode())
+                elif message[0] == "JOIN-ROOM":
+                    chatroom_name = message[1]
+                    peer_username = message[2]
+                    # Add the peer to the chat room
+                    db.add_user_to_chat_room(peer_username, chatroom_name)
+
+                    # Broadcast to all members that a new peer has joined
+                    self.broadcast_message(chatroom_name, f"{peer_username} joined the chat",sender_username=peer_username)
+
+                elif message[0] == "LEAVE-ROOM":
+                    chatroom_name = message[1]
+                    peer_username = message[2]
+                    # Remove the peer from the chat room
+                    db.remove_user_from_chat_room(peer_username, chatroom_name)
+
+                    # Broadcast to all members that a peer has left
+                    self.broadcast_message(chatroom_name, f"{peer_username} left the chat", sender_username=peer_username)
+                elif message[0] == "Enter-message/":
+                    self.broadcast_message(message[3], message[2],sender_username=message[1])
+
+
+                # Handle JOIN-CHAT-ROOM command
+                # elif message[0] == "JOIN-CHAT-ROOM":
                 #     chatroom_name = message[1]
+                #     username = message[2]
                 #     if db.is_chat_room_exist(chatroom_name):
-                #         response = "create-chat-room-fail Chat room already exists."
-                #         print("From-> " + self.ip + ":" + str(self.port) + " " + response)
-                #         logging.info("Send to " + self.ip + ":" + str(self.port) + " -> " + response)
-                #         self.tcpClientSocket.send(response.encode())
+                #         db.add_user_to_chat_room(username, chatroom_name)
+                #         response = f"JOIN-CHAT-ROOM-SUCCESS You joined {chatroom_name}."
                 #     else:
-                #         db.create_chat_room(chatroom_name)
-                #         response = "create-chat-room-success"
-                #         print("From-> " + self.ip + ":" + str(self.port) + " " + response)
-                #         logging.info("Send to " + self.ip + ":" + str(self.port) + " -> " + response)
-                #         self.tcpClientSocket.send(response.encode())
+                #         response = f"JOIN-CHAT-ROOM-FAIL Chat room {chatroom_name} does not exist."
+                #     print(response)
+                #     logging.info(response)
+                #     self.tcpClientSocket.send(response.encode())
                     ############################ADDED###########################
 
 
@@ -216,6 +276,20 @@ class ClientThread(threading.Thread):
     def resetTimeout(self):
         self.udpServer.resetTimer()
 
+    def broadcast_message(self, chatroom_name, message, sender_username=None):
+        # Get all members of the chat room
+        chat_members = db.get_chat_members(chatroom_name)
+
+        # Broadcast the message to all members
+        for member in chat_members:
+
+            peer_info = db.get_peer_ip_port(member)
+            ip = peer_info[0] if peer_info[0] is not None else "UNKNOWN_IP"
+            port = str(peer_info[1]) if peer_info[1] is not None else "UNKNOWN_PORT"
+
+            response = f"BROADCAST {chatroom_name} {ip}:{port} {message}"
+            logging.info("Send to " + ip + ":" + port + " -> " + response)
+            self.tcpClientSocket.send(response.encode())
 
 # implementation of the udp server thread for clients
 class UDPServer(threading.Thread):

@@ -33,9 +33,9 @@ class DB:
     def user_logout(self, username):
         self.db.online_peers.delete_one({"username": username})
 
-    def get_peer_ip_port(self, username):
-        res = self.db.online_peers.find_one({"username": username})
-        return (res["ip"], res["port"]) if res else (None, None)
+    # def get_peer_ip_port(self, username):
+    #     res = self.db.online_peers.find_one({"username": username})
+    #     return (res["ip"], res["port"]) if res else (None, None)
 
 
     def get_online_peers(self):
@@ -43,17 +43,57 @@ class DB:
         online_peers_list = [peer["username"] for peer in online_peers_cursor]
         return online_peers_list
 
-    # def is_chat_room_exist(self, chatroom_name):
-    #     return self.db.chat_rooms.count_documents({'name': chatroom_name}) > 0
-    #
-    # def create_chat_room(self, chatroom_name):
-    #     chat_room = {
-    #         "name": chatroom_name,
-    #         "members": []  # You can add more information about the chat room as needed
-    #     }
-    #     self.db.chat_rooms.insert_one(chat_room)
-    #
-    # def get_chat_rooms(self):
-    #     chat_rooms_cursor = self.db.chat_rooms.find({}, {"name": 1, "_id": 0})
-    #     chat_rooms_list = [chat_room["name"] for chat_room in chat_rooms_cursor]
-    #     return chat_rooms_list
+    def is_chat_room_exist(self, chatroom_name):
+        return self.db.chat_rooms.count_documents({'name': chatroom_name}) > 0
+
+    def create_chat_room(self, chatroom_name, chatroom_port):
+        chat_room = {
+            "name": chatroom_name,
+            "port": chatroom_port,
+            "members": []  # You can add more information about the chat room as needed
+        }
+        self.db.chat_rooms.insert_one(chat_room)
+
+    def get_chat_rooms(self):
+        chat_rooms_cursor = self.db.chat_rooms.find({}, {"name": 1, "port": 1, "_id": 0})
+        chat_rooms_list = [{"name": chat_room["name"], "port": chat_room["port"]} for chat_room in chat_rooms_cursor]
+        return chat_rooms_list
+
+    def get_room_port(self, chatroom_name):
+        chat_room = self.db.chat_rooms.find_one({"name": chatroom_name}, {"port": 1, "_id": 0})
+        if chat_room:
+            return chat_room["port"]
+        else:
+            # Return a default value or handle the case where the chat room doesn't exist
+            return None
+    def add_user_to_chat_room(self, username, chatroom_name):
+        # Find the chat room by name
+        # Find the chat room by name and update the members list
+        result = self.db.chat_rooms.update_one(
+            {"name": chatroom_name},
+            {"$addToSet": {"members": username}}
+        )
+        return result.modified_count > 0
+
+
+
+    def remove_user_from_chat_room(self, username, chatroom_name):
+        result = self.db.chat_rooms.update_one(
+            {"name": chatroom_name},
+            {"$pull": {"members": username}}
+        )
+        return result.modified_count > 0
+
+    def get_chat_members(self, chatroom_name):
+        chat_room = self.db.chat_rooms.find_one({"name": chatroom_name})
+        if chat_room:
+            return chat_room.get("members", [])
+        else:
+            return []
+
+    def get_peer_ip_port(self, username):
+        user = self.db.users.find_one({"username": username})
+        if user:
+            return user.get("ip"), user.get("port")
+        else:
+            return None, None
