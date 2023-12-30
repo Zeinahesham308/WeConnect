@@ -62,7 +62,7 @@ class ClientThread(threading.Thread):
                         password = message[2]
 
                         # Check if the password meets the specified criteria
-                        if (
+                        if ( 
                                 len(password) >= 8 and
                                 any(char.isdigit() for char in password) and  # At least one digit
                                 any(char.islower() for char in password) and  # At least one lowercase letter

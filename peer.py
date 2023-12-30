@@ -400,6 +400,7 @@ class PeerClient(threading.Thread):
                 receive_thread = threading.Thread(target=self.receive, args=(self.username,self.chatroomname))
                 receive_thread.start()
                 time.sleep(0.1)
+
                 # Assuming self.loginCredentials[0] and room_name are available in this context
                 send_thread = threading.Thread(target=self.write, args=(self.username, self.chatroomname))
                 send_thread.start()
