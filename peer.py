@@ -224,9 +224,6 @@ class PeerClient(threading.Thread):
         self.registryIP=registryIP
         self.roomport=roomport
 
-
-
-
     # main method of the peer client thread
     def run(self):
 
