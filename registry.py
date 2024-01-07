@@ -87,9 +87,9 @@ class ClientThread(threading.Thread):
                 elif message[0] == "LIST-PEERS":
                     online_peers = db.get_online_peers()
                     if online_peers:
-                        response = "Online-Peers: "  + ', '.join(online_peers)
+                        response = "Online-Peers: " + ', '.join(online_peers)
                     else:
-                        response = "No online peers."
+                        response = "No-online-peers"
                     logging.info("Send to " + self.ip + ":" + str(self.port) + " -> " + response)
                     self.tcpClientSocket.send(response.encode())
 
@@ -104,7 +104,7 @@ class ClientThread(threading.Thread):
                     if chat_rooms:
                         response = "LIST-GROUPS-SUCCESS: " + ', '.join(chat_rooms)
                     else:
-                        response = "No-available-rooms."
+                        response = "No-available-rooms"
                     logging.info("Send to " + self.ip + ":" + str(self.port) + " -> " )
                     self.tcpClientSocket.send(response.encode())
 
@@ -112,7 +112,7 @@ class ClientThread(threading.Thread):
                 elif message[0] == "SEARCH_ROOM":
                     # checks if a chat room with the given name exists
                     if db.is_chat_room_exist(message[1]):
-                        response = "search-room-success "
+                        response = "search-room-success"
                         logging.info("Send to " + self.ip + ":" + str(self.port) + " -> " + response)
                         self.tcpClientSocket.send(response.encode())
                     # enters if chat room does not exist
@@ -138,7 +138,7 @@ class ClientThread(threading.Thread):
                     peer_username = message[2]
                     # Handle the "ADD-PORT" message by adding the port to the database
                     db.online_peers_update_port(peer_username,room_port)
-                    response="Room port added successfully to the peer"
+                    response="ROOM-PORT-ADD-SUCCESS"
                     self.tcpClientSocket.send(response.encode())
                     # Add more conditions to handle other types of messages if needed
 
@@ -195,12 +195,12 @@ class ClientThread(threading.Thread):
 
 
                     if db.is_chat_room_exist(chatroom_name):
-                        response = "CREATE-CHAT-ROOM-FAIL Chat room already exists."
+                        response = "CREATE-CHAT-ROOM-FAIL"
                     else:
                         db.create_chat_room(chatroom_name)
                         response = "CREATE-CHAT-ROOM-SUCCESS"
 
-                    print(response)
+                    #print(response)
                     logging.info(response)
                     self.tcpClientSocket.send(response.encode())
 
@@ -276,11 +276,10 @@ class ClientThread(threading.Thread):
                         self.udpServer.timer.cancel()
                         break
                     else:
-
                         self.tcpClientSocket.close()
                         break
                 #add port #
-                elif message[0]=="ADD_RANDOMED_PORT":
+                elif message[0]=="ADD-RANDOMED-PORT":
                     response=self.generate_random_port()
                     self.tcpClientSocket.send(str(response).encode())
 

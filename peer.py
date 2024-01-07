@@ -11,21 +11,18 @@ import threading
 import time
 import select
 import logging
+
+import ChatRoomManager
 import GUI
 from colorama import Fore, Style, init
 from pyfiglet import Figlet
-
+import UserManager
+import PeersManager
 # Create a Figlet object
 fig = Figlet(font='slant', width=100)
 
 clients = {}
 
-##############################ADDED##################################
-bold_pattern = r'\*\*(?=[^\s\*])(.*?)([^\s\*])\*\*'
-italic_pattern = r'(?<!\S)_(?=\S)(.*?)(?<=\S)_(?!\S)'
-
-
-# Server side of peer
 class PeerServer(threading.Thread):
 
     # Peer server initialization
@@ -274,9 +271,9 @@ class PeerClient(threading.Thread):
                         # message input prompt
                         messageSent = input("")
 
-                        messageSent = self.send_message_bold(messageSent)
+                        messageSent = GUI.send_message_bold(messageSent)
 
-                        messageSent = self.send_message_Italic(messageSent)
+                        messageSent = GUI.send_message_Italic(messageSent)
 
                         # sends the message to the connected peer, and logs it
                         self.tcpClientSocket.send(messageSent.encode())
@@ -339,9 +336,9 @@ class PeerClient(threading.Thread):
                     # input prompt for user to enter message
                     messageSent = input("")
 
-                    messageSent = self.send_message_bold(messageSent)
+                    messageSent = GUI.send_message_bold(messageSent)
 
-                    messageSent = self.send_message_Italic(messageSent)
+                    messageSent = GUI.send_message_Italic(messageSent)
 
                     self.tcpClientSocket.send(messageSent.encode())
                     logging.info("Send to " + self.ipToConnect + ":" + str(self.portToConnect) + " -> " + messageSent)
@@ -361,17 +358,6 @@ class PeerClient(threading.Thread):
                     self.tcpClientSocket.close()
         else :
             self.peerServer.roomflag =1
-
-    #####################ADDED##############################
-    def send_message_bold(self, message):
-        # Use re.sub to replace bold matches with formatted text
-        formatted_message = re.sub(bold_pattern, r"\033[1m\1\033[0m\2", message)
-        return formatted_message
-
-    def send_message_Italic(self, message):
-        formatted_message = re.sub(italic_pattern, r"\033[3m\1\033[0m", message)
-        return formatted_message
-
 
 
 ###########################################Updated#######################################
@@ -548,24 +534,15 @@ class PeerChatRoom(threading.Thread):
                 else:
                     # message = f"Enter- {peername} {room_name} {content}"
                     message = f"{content}"
-                    message = self.send_message_bold(message)
+                    message = GUI.send_message_bold(message)
 
-                    message = self.send_message_Italic(message)
+                    message = GUI.send_message_Italic(message)
 
                     # Use broadcast_message function instead of UDP socket
                     self.broadcast_message(room_name, message, peername)
             except Exception as e:
                 print(f"Error in write loop: {str(e)}")
                 break
-
-    def send_message_bold(self, message):
-        # Use re.sub to replace bold matches with formatted text
-        formatted_message = re.sub(bold_pattern, r"\033[1m\1\033[0m", message)
-        return formatted_message
-
-    def send_message_Italic(self, message):
-        formatted_message = re.sub(italic_pattern, r"\033[3m\1\033[0m", message)
-        return formatted_message
 
 
 ###############ADDED##############################
@@ -580,12 +557,9 @@ class peerMain:
         self.registryPort = 15600
         # tcp socket connection to registry
         self.tcpClientSocket = socket(AF_INET, SOCK_STREAM)
-
         self.tcpClientSocket.connect((self.registryName,self.registryPort))
-
         # initializes udp socket which is used to send hello messages
         self.udpClientSocket = socket(AF_INET, SOCK_DGRAM)
-
         # udp port of the registry
         self.registryUDPPort = 15500
         # login info of the peer
@@ -604,7 +578,9 @@ class peerMain:
         self.timer = None
         self.stop_threads = False
         self.room_name=None
-
+        self.UserManager= UserManager.UserManager(self.registryName,self.registryPort,self.tcpClientSocket)
+        self.ChatRoomManager=ChatRoomManager.ChatRoomManager(self.registryName, self.registryPort, self.tcpClientSocket, self.loginCredentials)
+        self.PeerManager = PeersManager.PeersManager(self.registryName,self.registryPort,self.tcpClientSocket)
         choice = "0"
         entered = "0" ###############
         # log file initialization
@@ -624,17 +600,20 @@ class peerMain:
                 print()
 
                 password = input("password: ")
-                self.createAccount(username, password)
+
+                #self.createAccount(username, password)
+                self.UserManager.create_account(username, password)
 
             elif choice == "2" and not self.isOnline:
                 username = input("username: ")
                 password = input("password: ")
                 # asks for the port number for server's tcp socket
                 ######################
-                peerServerPort=self.portsHandling()
+                peerServerPort=self.UserManager.portsHandling()
                 ######################
                 #peerServerPort = int(input("Enter a port number for peer server: "))
-                status = self.login(username, password, peerServerPort)
+                status = self.UserManager.login(username, password, peerServerPort)
+                #status = self.login(username, password, peerServerPort)
                 if status == 1:
                     self.isOnline = True
                     self.loginCredentials = (username, password)
@@ -646,19 +625,21 @@ class peerMain:
                     self.sendHelloMessage()
                     entered=1
 
+
         while choice != "8":
             # menu selection prompt
             choice = input("WELCOME .... \nChoose:\nList online users: 1\nlist availabe group chat rooms: 2\nStart a chat with a user: 3\nSearch a user: 4\nSearch a group chat room: 5\ncreate a group chat room: 6\nJoin a group chat room: 7\nLogout: 8\n")
 
             if choice == "1":
-                self.retrievepeers()
+                self.PeerManager.retrieve_peers()
 
             elif choice == "2" :
-                self.list_chat_rooms()
+                self.ChatRoomManager=ChatRoomManager.ChatRoomManager(self.registryName, self.registryPort, self.tcpClientSocket, self.loginCredentials)
+                self.ChatRoomManager.list_chat_rooms()
 
             elif choice == "3":
                 username = input("Enter the username of user to start chat: ")
-                searchStatus = self.searchUser(username)
+                searchStatus = self.PeerManager.search_user(username)
                 # if searched user is found, then its ip address and port number is retrieved
                 # and a client thread is created
                 # main process waits for the client thread to finish its chat
@@ -670,29 +651,28 @@ class peerMain:
 
             elif choice == "4" :
                 username = input("Username to be searched: ")
-                searchStatus = self.searchUser(username)
+                searchStatus =self.PeerManager.search_user(username)
                 # if user is found its ip address is shown to user
                 if searchStatus != None and searchStatus != 0:
                     print("IP address of " + username + " is " + searchStatus)
 
             elif choice == "5":
+
                 # User wants to search for a group chat room
                 room_name = input("Enter the name of the chat room to search: ")
-                room_status = self.search_room_status(room_name)
-                if room_status is not None:
-                    # Handle the room status as needed
-                    GUI.print_colored(f"It's port number: {room_status} ", Fore.LIGHTBLUE_EX, Style.BRIGHT)
-                    print()
+                self.ChatRoomManager.search_room_status(room_name)
 
             elif choice == "6" and self.isOnline:
-                self.create_chat_room()
+                self.ChatRoomManager = ChatRoomManager.ChatRoomManager(self.registryName, self.registryPort,
+                                                                       self.tcpClientSocket, self.loginCredentials)
+                self.ChatRoomManager.create_chat_room()
 
             ##############################ADDED##################################
             elif choice == "7" and self.isOnline:
                 room_name = input("Enter the chat room name to join: ")
                 self.room_name=room_name
-                room_Port = self.portsHandling()
-                room_status = self.search_room_status(room_name)
+                room_Port = self.UserManager.portsHandling()
+                room_status = self.ChatRoomManager.search_room_status(room_name)
 
                 # Now you can use room_status as needed in your program
                 if room_status:
@@ -703,7 +683,8 @@ class peerMain:
                     #GUI.print_colored( "Enter QUIT to exit chatroom \n", Fore.LIGHTYELLOW_EX, Style.BRIGHT)
                     # Example of starting a thread for receiving messages
                     # Assuming self.loginCredentials[0] contains the peer's name
-                    self.add_room_port(room_Port)
+                    self.ChatRoomManager = ChatRoomManager.ChatRoomManager(self.registryName, self.registryPort,self.tcpClientSocket, self.loginCredentials)
+                    self.ChatRoomManager.add_room_port(room_Port)
                     self.PeerChatRoom = PeerChatRoom(self.registryPort, self.peerServerPort , self.loginCredentials[0], self.peerServer, None, 1,self.room_name,self.registryName,room_Port)
                     self.PeerChatRoom.start()
                     self.PeerChatRoom.join()
@@ -716,8 +697,9 @@ class peerMain:
                     print(f"The chat room '{room_name}' does not exist.")
 
             elif choice == "8":
-                self.logout(1)
-                self.logout(2)
+                self.UserManager.logout(1,self.loginCredentials[0],self.peerServerPort)
+                self.UserManager.logout(2,self.loginCredentials[0],self.peerServerPort)
+                self.timer.cancel()
                 self.isOnline = False
                 self.loginCredentials = (None, None)
                 self.peerServer.isOnline = False
@@ -759,185 +741,6 @@ class peerMain:
         # socket of the client is closed
         if choice != "CANCEL":
             self.tcpClientSocket.close()
-
-
-
-    # account creation function
-    def createAccount(self, username, password):
-        # join message to create an account is composed and sent to registry
-        # if response is success then informs the user for account creation
-        # if response is exist then informs the user for account existence
-        message = "JOIN " + username + " " + password
-        logging.info("Send to " + self.registryName + ":" + str(self.registryPort) + " -> " + message)
-        self.tcpClientSocket.send(message.encode())
-        response = self.tcpClientSocket.recv(1024).decode()
-        logging.info("Received from " + self.registryName + " -> " + response)
-        if response == "join-success":
-            print("Account created...")
-        elif response == "NotValid-Password":
-            print("Password does not meet the criteria. Signup again or login")
-        elif response == "join-exist":
-            print("choose another username or login...")
-
-    # login function
-    def login(self, username, password, peerServerPort):
-        # a login message is composed and sent to registry
-        # an integer is returned according to each response
-        message = "LOGIN " + username + " " + password + " " + str(peerServerPort)
-        logging.info("Send to " + self.registryName + ":" + str(self.registryPort) + " -> " + message)
-        self.tcpClientSocket.send(message.encode())
-        response = self.tcpClientSocket.recv(1024).decode()
-        logging.info("Received from " + self.registryName + " -> " + response)
-        if response == "login-success":
-
-            GUI.print_colored("Logged in successfully...", Fore.LIGHTGREEN_EX, Style.BRIGHT)
-            print()
-            return 1
-        elif response == "login-account-not-exist":
-            GUI.print_colored("Account does not exist...", Fore.LIGHTRED_EX, Style.BRIGHT)
-            print()
-            return 0
-        elif response == "login-online":
-            GUI.print_colored("Account is already online...", Fore.LIGHTYELLOW_EX, Style.BRIGHT)
-            print()
-            return 2
-        elif response == "login-wrong-password":
-            GUI.print_colored("Wrong password...", Fore.LIGHTRED_EX, Style.BRIGHT)
-            print()
-            return 3
-
-    # logout function
-    def logout(self, option):
-        # a logout message is composed and sent to registry
-        # timer is stopped
-        if option == 1:
-            message = "LOGOUT " + str(self.loginCredentials[0]) +" "+ str(self.peerServerPort)
-            self.timer.cancel()
-        else:
-            message = "LOGOUT"
-        logging.info("Send to " + self.registryName + ":" + str(self.registryPort) + " -> " + message)
-        self.tcpClientSocket.send(message.encode())
-
-#################added#####################################
-    def retrievepeers(self):
-        message = "LIST-PEERS"
-        logging.info("Send to " + self.registryName + ":" + str(self.registryPort) + " -> " + message)
-
-        self.tcpClientSocket.send(message.encode())
-
-        response = self.tcpClientSocket.recv(1024).decode()
-
-        logging.info("Received from " + self.registryName + " -> " + response)
-        # Process the response to extract the list of peers
-
-        if response.startswith("Online-Peers: "):
-            online_peers = response.split(": ")[1].split(", ")
-            #print("Online Peers:", online_peers)
-            GUI.print_colored("Online Peers:", Fore.LIGHTGREEN_EX, Style.BRIGHT)
-            GUI.print_colored(f"{online_peers}\n", Fore.LIGHTGREEN_EX, Style.BRIGHT)
-        else:
-            print(response)  # Print the message indicating no online
-
-
-    #####################################ADDED######################
-    def list_chat_rooms(self):
-        message = "LIST-GROUPS"
-        logging.info("Send to " + self.registryName + ":" + str(self.registryPort) + " -> " + message)
-
-        self.tcpClientSocket.send(message.encode())
-
-        response = self.tcpClientSocket.recv(1024).decode()
-
-        logging.info("Received from " + self.registryName + " -> " + response)
-
-        # Process the response to extract the list of peers
-        if response.startswith("LIST-GROUPS-SUCCESS"):
-            try:
-
-                online_groups = response.split(": ")[1].split(", ")
-                GUI.print_colored("Available Chat Rooms: ", Fore.LIGHTGREEN_EX, Style.BRIGHT)
-                GUI.print_colored(f"{online_groups}\n", Fore.LIGHTGREEN_EX, Style.BRIGHT)
-            except IndexError:
-                print(response)
-                print("Error parsing the response. The format may be incorrect.")
-        else:
-            print(response)  # Print the message indicating no online
-
-    def create_chat_room(self):
-        room_name = input("Enter the chat room name: ")
-        #room_port = input("Enter the chat room port: ")  # Add this line to get the port from the user
-
-        message = f"CREATE-CHAT-ROOM {room_name} {self.loginCredentials[0]} "
-        logging.info("Send to " + self.registryName + ":" + str(self.registryPort) + " -> " + message)
-        self.tcpClientSocket.send(message.encode())
-        response = self.tcpClientSocket.recv(1024).decode()
-
-        logging.info("Received from " + self.registryName + " -> " + response)
-        print(response)
-
-    def search_room_status(self, room_name):
-        # a search message for the chat room is composed and sent to the database
-        message = "SEARCH_ROOM " + room_name
-        logging.info("Send to " + self.registryName + ":" + str(self.registryPort) + " -> " + message)
-        self.tcpClientSocket.send(message.encode())
-        response = self.tcpClientSocket.recv(1024).decode().split()
-        logging.info("Received from " + self.registryName + " -> " )
-
-        if response[0] == "search-room-success":
-            GUI.print_colored(f"{room_name} is found successfully...", Fore.LIGHTGREEN_EX, Style.BRIGHT)
-            print()
-            return 1
-        elif response[0] == "search-room-not-found":
-            GUI.print_colored(f"{room_name} is not found\n", Fore.LIGHTRED_EX, Style.BRIGHT)
-            print()
-            return None
-
-    def add_room_port(self, room_port):
-        try:
-            # Prepare the message to send to the registry
-            message = f"ADD-PORT {room_port} {self.loginCredentials[0]}"
-
-            # Send the message to the registry
-            self.tcpClientSocket.send(message.encode())
-
-            # Receive the response if needed
-            response = self.tcpClientSocket.recv(1024).decode()
-            print(response)
-            # Handle the response as per your requirements
-
-        except Exception as e:
-            print(f"Error in add_room_port: {str(e)}")
-
-    def searchUser(self, username):
-        # a search message is composed and sent to registry
-        # custom value is returned according to each response
-        # to this search message
-        message = "SEARCH " + username
-        logging.info("Send to " + self.registryName + ":" + str(self.registryPort) + " -> " + message)
-        self.tcpClientSocket.send(message.encode())
-        response = self.tcpClientSocket.recv(1024).decode().split()
-        logging.info("Received from " + self.registryName + " -> " + " ".join(response))
-        if response[0] == "search-success":
-            GUI.print_colored(f" {username} is found successfully...", Fore.LIGHTGREEN_EX, Style.BRIGHT)
-            print()
-            return response[1]
-        elif response[0] == "search-user-not-online":
-            GUI.print_colored(f" {username}  is not online...", Fore.LIGHTRED_EX, Style.BRIGHT)
-            print()
-            return 0
-        elif response[0] == "search-user-not-found":
-            GUI.print_colored(f" {username}   is not found", Fore.LIGHTRED_EX, Style.BRIGHT)
-            print()
-
-            return None
-    def portsHandling(self):
-        message = "ADD_RANDOMED_PORT"
-        self.tcpClientSocket.send(message.encode())
-        portno = int(self.tcpClientSocket.recv(1024).decode())
-        return portno
-
-
-
 
     # function for sending hello message
     # a timer thread is used to send hello messages to udp socket of registry
