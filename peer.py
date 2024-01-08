@@ -478,6 +478,7 @@ class PeerChatRoom(threading.Thread):
                         broadcast_message = sender_username + "->" + message
                         logging.info(f"Send to {room_port} -> {broadcast_message}")
                         self.udpClientSocket.sendto(broadcast_message.encode(), (self.registryIP, room_port))
+
                     except Exception as e:
                         logging.error(f"Error broadcasting message to peer on port {room_port}: {str(e)}")
                 else:
